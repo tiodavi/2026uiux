@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>華麗商品展示頁</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; }
+
+        /* --- 篩選按鈕區 (保留這段) --- */
+        .filter-nav { text-align: center; margin-bottom: 40px; }
+        .filter-btn { padding: 10px 20px; margin: 5px; cursor: pointer; background-color: white; border: 2px solid black; border-radius: 25px; transition: all 0.2s ease; font-size: 14px; }
+        .filter-btn:hover { background-color: #cccccc; border-color: #cccccc; }
+        .filter-btn:active, .filter-btn.active { background-color: black; color: white; border-color: black; }
+
+        /* --- 購物車按鈕區 (保留這一段就好，確保沒有重複的 .btn) --- */
+        .btn { 
+            padding: 12px; 
+            background: white;       
+            color: black;            
+            border: 2px solid black; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            font-weight: bold;
+        }
+        .btn:hover { background: #cccccc; border-color: #cccccc; color: black; }
+        .btn:active { background: black; color: white; border-color: black; }
+
+        /* --- 網格與卡片 (保留這段) --- */
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; max-width: 1200px; margin: 0 auto; }
+        .card { background: white; border-radius: 16px; padding: 20px; transition: 0.4s; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 20px 30px rgba(0,0,0,0.15); }
+        .img-box { height: 200px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
+        .img-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .category { font-size: 11px; text-transform: uppercase; color: #888; background: #eee; padding: 4px 8px; border-radius: 4px; align-self: flex-start; }
+        .title { font-size: 16px; font-weight: bold; margin: 10px 0; height: 3em; overflow: hidden; color: #333; }
+        .price { font-size: 20px; font-weight: bold; color: #d32f2f; margin-top: auto; padding: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>精選商品列表</h1>
+    <div class="filter-nav" id="filter-nav">
+        <button class="filter-btn active" onclick="filterProducts('all', this)">全部</button>
+    </div>
+
+    <div class="product-grid" id="container"></div>
+
+    <script>
+        let allProducts = [];
+
+        async function init() {
+            // 1. 取得分類並產生按鈕
+            const categories = await (await fetch('https://fakestoreapi.com/products/categories')).json();
+            const nav = document.getElementById('filter-nav');
+            
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn';
+                btn.innerText = cat;
+                // 使用箭頭函式傳遞參數，完美避開單引號語法錯誤
+                btn.onclick = () => filterProducts(cat, btn);
+                nav.appendChild(btn);
+            });
+
+            // 2. 取得所有商品
+            allProducts = await (await fetch('https://fakestoreapi.com/products')).json();
+            renderProducts(allProducts);
+        }
+
+        function renderProducts(products) {
+            const container = document.getElementById('container');
+            container.innerHTML = products.map(p => `
+                <div class="card">
+                    <div class="img-box"><img src="${p.image}" alt="${p.title}"></div>
+                    <div class="category">${p.category}</div>
+                    <div class="title">${p.title}</div>
+                    <div class="price">$${p.price}</div>
+                    <button class="btn">加入購物車</button>
+                </div>
+            `).join('');
+        }
+
+        function filterProducts(category, btnElement) {
+            // 切換按鈕樣式
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // 過濾邏輯
+            const filtered = category === 'all' 
+                ? allProducts 
+                : allProducts.filter(p => p.category === category);
+            renderProducts(filtered);
+        }
+
+        init();
+    </script>
+</body>
+</html>

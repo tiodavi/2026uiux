@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地圖搜尋與熱門快捷鍵連動</title>
+    <style>
+        /* --- 全域重設 --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* 手機外框佈局 */
+        .phone-layout {
+            width: 100%;
+            max-width: 414px;
+            background-color: #3a3a3a; /* 依據圖 3 調整的深灰底色 */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+        }
+
+        /* 頂部搜尋列外殼 */
+        .search-area {
+            background-color: #1a1a1a;
+            padding: 15px 15px 12px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-btn {
+            padding: 12px 18px;
+            background-color: #007aff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .search-btn:active { background-color: #0056b3; }
+
+        /* 💡 全新增：熱門關鍵字快捷鍵區域 */
+        .quick-tags-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto; /* 手機上若按鈕變多可橫向滑動 */
+            padding-bottom: 2px;
+        }
+        /* 隱藏橫向滾動條，保持介面乾淨 */
+        .quick-tags-container::-webkit-scrollbar { display: none; }
+
+        .tag-btn {
+            background-color: #333333;
+            color: #ffffff;
+            border: 1px solid #444444;
+            padding: 6px 12px;
+            border-radius: 20px; /* 膠囊形狀 */
+            font-size: 0.82rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        /* 點擊或啟用時的視覺反饋 */
+        .tag-btn:active, .tag-btn.active {
+            background-color: #007aff;
+            border-color: #007aff;
+            transform: scale(0.95);
+        }
+
+        /* 地圖區域 */
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background-color: #e5e3df;
+        }
+
+        .map-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        /* Loading 遮罩 */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(58, 58, 58, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            transition: opacity 0.3s ease;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #555;
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-overlay.hide { opacity: 0; pointer-events: none; }
+
+        /* --- 手風琴列表區塊 --- */
+        .info-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            background-color: #3a3a3a;
+        }
+
+        .accordion-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            cursor: pointer;
+            background-color: #3a3a3a;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+        .accordion-header:active { background-color: #4a4a4a; }
+
+        .list-text {
+            color: #ffffff;
+            font-size: 1.05rem;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        .chevron-icon {
+            width: 10px;
+            height: 10px;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            transform: rotate(45deg);
+            margin-left: 15px;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+            opacity: 0.9;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: #2e2e2e;
+        }
+
+        .accordion-item.active .chevron-icon {
+            transform: rotate(-135deg);
+        }
+
+        .item-divider {
+            height: 1px;
+            background-color: #666666;
+            margin: 0 25px;
+            opacity: 0.4;
+        }
+
+        /* 選單 1：即時狀態圖形化樣式 */
+        .graphic-container {
+            padding: 20px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .graphic-row { display: flex; gap: 12px; }
+        .graphic-card {
+            flex: 1; background-color: #3a3a3a; border-radius: 8px; padding: 12px; text-align: center;
+        }
+        .card-num { font-size: 1.5rem; font-weight: bold; color: #fff; margin-top: 5px; }
+        .card-lbl { font-size: 0.75rem; color: #aaa; }
+        .progress-group { display: flex; flex-direction: column; gap: 6px; }
+        .progress-labels { display: flex; justify-content: space-between; font-size: 0.85rem; color: #ddd; }
+        .progress-bar-bg { width: 100%; height: 8px; background-color: #4a4a4a; border-radius: 4px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #5ac8fa, #007aff); border-radius: 4px; }
+
+        /* 選單 2：交通與大眾運輸時間軸樣式 */
+        .transit-container {
+            padding: 22px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .transit-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #3a3a3a;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #fff;
+        }
+        .time-badge {
+            background-color: #007aff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .timeline { display: flex; flex-direction: column; position: relative; padding-left: 24px; }
+        .timeline::before {
+            content: ''; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background-color: #555;
+        }
+        .timeline-item { position: relative; padding-bottom: 20px; }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute; left: -24px; top: 4px; width: 14px; height: 14px; border-radius: 50%; background-color: #555; border: 3px solid #2e2e2e;
+        }
+        .timeline-dot.metro-dot { background-color: #e61721; }
+        .timeline-dot.walk-dot { background-color: #4cd964; }
+        .timeline-info { display: flex; flex-direction: column; gap: 4px; }
+        .transit-route { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; color: #fff; font-weight: bold; }
+        .line-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; color: #fff; font-weight: bold; background-color: #ff3b30; }
+        .transit-desc { font-size: 0.85rem; color: #aaa; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+    <div class="phone-layout">
+        
+        <div class="search-area">
+            <div class="search-container">
+                <input type="text" id="targetLocation" class="search-input" placeholder="輸入地名或點擊下方熱門選項" value="高雄車站">
+                <button id="searchBtn" class="search-btn">搜尋</button>
+            </div>
+            
+            <div class="quick-tags-container">
+                <button class="tag-btn" onclick="quickSearch('高雄車站')">🚉 高雄車站</button>
+                <button class="tag-btn" onclick="quickSearch('台北101')">🗼 台北101</button>
+                <button class="tag-btn" onclick="quickSearch('陽明山')">⛰️ 陽明山</button>
+            </div>
+        </div>
+
+        <div class="map-wrapper">
+            <div id="loadingMask" class="loading-overlay">
+                <div class="spinner"></div>
+            </div>
+            <iframe 
+                id="mapIframe"
+                src="https://maps.google.com/maps?q=Melbourne%20Park&t=&z=15&ie=UTF-8&iwloc=&output=embed" 
+                allowfullscreen="" 
+                loading="lazy">
+            </iframe>
+        </div>
+
+        <div class="info-container">
+            
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <span class="list-text" id="titlePlace">高雄車站 (正常營運)</span>
+                    <div class="chevron-icon"></div>
+                </div>
+                <div class="accordion-content">
+                    <div class="graphic-container">
+                        <div class="graphic-row">
+                            <div class="graphic-card">
+                                <div class="card-lbl">☀️ 當前天氣</div>
+                                <div class="card-num" id="graphWeather">28°C</div>
+                            </div>
+                            <div class="graphic-card">
+                                <div class="card-lbl">👍 推薦指數</div>
+                                <div class="card-num" id="graphRate">95%</div>
+                            </div>
+                        </div>
+                        <div class="progress-group">
+                            <div class="progress-labels"><span>🍃 環境舒適度</span><span id="textComfort">極佳 (90%)</span></div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="barComfort" style="width: 90%;"></div></div>
+                        </div>
+                        <div class="progress-group">
+                            <div class="progress-labels"><span>👥 現場擁擠度</span><span id="textCrowd">正常 (40%)</span></div>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill" id="barCrowd" style="width: 40%; background: linear-gradient(90deg, #ffcc00, #ff9500);"></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="item-divider"></div>
+            </div>
+
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <span class="list-text">🚇 交通與大眾運輸指引</span>
+                    <div class="chevron-icon"></div>
+                </div>
+                <div class="accordion-content">
+                    <div class="transit-container">
+                        <div class="transit-summary">
+                            <span>最佳路徑預估時間</span>
+                            <span class="time-badge" id="totalTransitTime">約 12 分鐘</span>
+                        </div>
+
+                        <div class="timeline">
+                            <div class="timeline-item">
+                                <div class="timeline-dot metro-dot" id="dotMetroColor"></div>
+                                <div class="timeline-info">
+                                    <div class="transit-route">
+                                        <span>搭乘大眾運輸</span>
+                                        <span class="line-badge" id="badgeLineName" style="background-color: #e61721;">紅線</span>
+                                    </div>
+                                    <div class="transit-desc" id="textRouteStep1">
+                                        搭乘高雄捷運紅線，乘車至「高雄車站」下車。
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="timeline-item">
+                                <div class="timeline-dot walk-dot"></div>
+                                <div class="timeline-info">
+                                    <div class="transit-route">
+                                        <span>🚶 出站步行</span>
+                                        <span style="font-size: 0.8rem; color: #4cd964;" id="textWalkTime">約 2 分鐘</span>
+                                    </div>
+                                    <div class="transit-desc" id="textRouteStep2">
+                                        由 1 號出口出站，跟隨站內指標即可直接無縫進入車站大廳。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="item-divider"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('targetLocation');
+        const searchBtn = document.getElementById('searchBtn');
+        const mapIframe = document.getElementById('mapIframe');
+        const loadingMask = document.getElementById('loadingMask');
+
+        // 手風琴展開收合控制
+        const accordions = document.querySelectorAll('.accordion-header');
+        accordions.forEach(header => {
+            header.addEventListener('click', function() {
+                const item = this.parentElement;
+                const content = this.nextElementSibling;
+                const isOpen = item.classList.contains('active');
+                
+                if (!isOpen) {
+                    item.classList.add('active');
+                    content.style.maxHeight = content.scrollHeight + "px";
+                } else {
+                    item.classList.remove('active');
+                    content.style.maxHeight = null;
+                }
+            });
+        });
+
+        // 核心資料庫
+        const mockDatabase = {
+            '高雄車站': { 
+                title: '高雄車站 (正常營運)', weather: '28°C', rate: '95%', comfortText: '極佳 (90%)', comfortWidth: '90%', crowdText: '正常 (40%)', crowdWidth: '40%',
+                totalTime: '約 12 分鐘', lineName: '紅線', lineColor: '#e61721', dotColor: '#e61721',
+                step1: '搭乘高雄捷運紅線，乘車至「高雄車站」下車。',
+                walkTime: '約 2 分鐘', step2: '由 1 號出口出站，跟隨站內指標即可直接無縫進入車站大廳。'
+            },
+            '台北101': { 
+                title: '台北101 (營業中)', weather: '22°C', rate: '88%', comfortText: '普通 (60%)', comfortWidth: '60%', crowdText: '非常擁擠 (90%)', crowdWidth: '90%',
+                totalTime: '約 25 分鐘', lineName: '信義線', lineColor: '#007aff', dotColor: '#007aff',
+                step1: '搭乘台北捷運紅線（淡水信義線），往象山方向至「台北101/世貿站」下車。',
+                walkTime: '約 1 分鐘', step2: '從 4 號出口出站，出站後即可無縫直通 101 地下一樓美食街與商場。'
+            },
+            '陽明山': { 
+                title: '陽明山國家公園 (24H開放)', weather: '17°C', rate: '75%', comfortText: '涼爽微雨 (50%)', comfortWidth: '50%', crowdText: '人潮空曠 (15%)', crowdWidth: '15%',
+                totalTime: '約 45 分鐘', lineName: '紅5公車', lineColor: '#ff9500', dotColor: '#ff9500',
+                step1: '搭乘捷運淡水信義線至「劍潭站」下車，由 1 號出口出站，轉乘「紅5」或「260」路線公車。',
+                walkTime: '約 15 分鐘', step2: '於陽明山總站下車，依循指標步行或換乘遊園公車前往目的地景區。'
+            }
+        };
+
+        // 核心更新方法
+        function updateMapAndInfo() {
+            const query = searchInput.value.trim();
+            if (query === '') return;
+
+            loadingMask.classList.remove('hide');
+
+            const encodedQuery = encodeURIComponent(query);
+            mapIframe.src = `https://maps.google.com/maps?q=${encodedQuery}&t=&z=15&ie=UTF-8&iwloc=&output=embed`;
+
+            // 搜尋時關閉目前所有打開的手風琴
+            document.querySelectorAll('.accordion-item').forEach(i => {
+                i.classList.remove('active');
+                i.querySelector('.accordion-content').style.maxHeight = null;
+            });
+
+            let data = mockDatabase[query];
+            if (!data) {
+                const randomTemp = Math.floor(Math.random() * (30 - 20 + 1)) + 20;
+                data = {
+                    title: `${query} (即時連動)`, weather: `${randomTemp}°C`, rate: '90%', comfortText: '良好 (80%)', comfortWidth: '80%', crowdText: '正常 (35%)', crowdWidth: '35%',
+                    totalTime: '約 15 分鐘', lineName: '大眾運輸', lineColor: '#007aff', dotColor: '#007aff',
+                    step1: `搭乘當地的主要捷運或公車幹線，並朝「${query}」方向前進，在最近站點下車。`,
+                    walkTime: '約 5 分鐘', step2: `下車後開啟導航，依循路標走約 5 分鐘即可抵達「${query}」。`
+                };
+            }
+            
+            // 填入選單 1 資料
+            document.getElementById('titlePlace').innerText = data.title;
+            document.getElementById('graphWeather').innerText = data.weather;
+            document.getElementById('graphRate').innerText = data.rate;
+            document.getElementById('textComfort').innerText = data.comfortText;
+            document.getElementById('barComfort').style.width = data.comfortWidth;
+            document.getElementById('textCrowd').innerText = data.crowdText;
+            document.getElementById('barCrowd').style.width = data.crowdWidth;
+
+            // 填入選單 2 資料
+            document.getElementById('totalTransitTime').innerText = data.totalTime;
+            const badge = document.getElementById('badgeLineName');
+            badge.innerText = data.lineName;
+            badge.style.backgroundColor = data.lineColor;
+            document.getElementById('dotMetroColor').style.backgroundColor = data.dotColor;
+            document.getElementById('textRouteStep1').innerText = data.step1;
+            document.getElementById('textWalkTime').innerText = data.walkTime;
+            document.getElementById('textRouteStep2').innerText = data.step2;
+        }
+
+        // 💡 快捷鍵點擊觸發函數
+        function quickSearch(placeName) {
+            searchInput.value = placeName; // 1. 將輸入框文字換掉
+            updateMapAndInfo();            // 2. 觸發搜尋與圖形化渲染
+        }
+
+        searchBtn.addEventListener('click', updateMapAndInfo);
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') updateMapAndInfo(); });
+        mapIframe.onload = () => { loadingMask.classList.add('hide'); };
+    </script>
+
+</body>
+</html>
