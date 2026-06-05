@@ -9,23 +9,45 @@
 </head>
 <body class="bg-[#0b0f19] text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500 selection:text-black">
 
-    <nav class="flex items-center justify-between p-6 max-w-6xl mx-auto border-b border-slate-800/60">
-        <div class="text-xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-            DESIGNER.IO
+    <!-- 導覽列區塊 -->
+    <nav class="relative z-50 bg-[#0b0f19]/90 backdrop-blur-md border-b border-slate-800/60">
+        <div class="flex items-center justify-between p-6 max-w-6xl mx-auto">
+            <div class="text-xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                DESIGNER.IO
+            </div>
+            
+            <!-- 桌機版選單 -->
+            <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+                <a href="#" class="hover:text-white transition-colors duration-300">作品集</a>
+                <a href="figma3gal.html" class="hover:text-white transition-colors duration-300">gallery</a>
+                <a href="0601f3map.html" class="hover:text-white transition-colors duration-300">map</a>
+                <a href="figma1gallery.html" class="hover:text-white transition-colors duration-300">picture</a>
+                <a href="https://20260527uiux.vercel.app/" class="hover:text-white transition-colors duration-300">火車查詢UI</a>
+                <a href="#" class="hover:text-white transition-colors duration-300">關於我</a>
+                <button class="bg-white/5 border border-white/10 hover:bg-white/10 text-white px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-300 backdrop-blur-sm">
+                    聯絡我
+                </button>
+            </div>
+            
+            <!-- 手機版漢堡按鈕 (已加入點擊觸發功能與旋轉動畫) -->
+            <div onclick="toggleMobileMenu()" class="block md:hidden text-xl cursor-pointer hover:text-cyan-400 transition-colors duration-300 w-6 h-6 flex items-center justify-center">
+                <i id="menu-icon" class="fas fa-bars transition-transform duration-300"></i>
+            </div>
         </div>
-        <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-            <a href="#" class="hover:text-white transition-colors duration-300">作品集</a>
-            <a href="figma3gal.html" class="hover:text-white transition-colors duration-300">gallery</a>
-            <a href="0601f3map.html" class="hover:text-white transition-colors duration-300">map</a>
-            <a href="figma1gallery.html" class="hover:text-white transition-colors duration-300">picture</a>
-            <a href="https://20260527uiux.vercel.app/" class="hover:text-white transition-colors duration-300">火車查詢UI</a>
-            <a href="#" class="hover:text-white transition-colors duration-300">關於我</a>
-            <button class="bg-white/5 border border-white/10 hover:bg-white/10 text-white px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-300 backdrop-blur-sm">
-                聯絡我
-            </button>
-        </div>
-        <div class="block md:hidden text-xl cursor-pointer hover:text-cyan-400 transition-colors">
-            <i class="fas fa-bars"></i>
+
+        <!-- 手機版下拉選單內容 (新加入的功能區塊) -->
+        <div id="mobile-menu" class="hidden opacity-0 -translate-y-4 md:hidden absolute top-full left-0 w-full bg-[#0b0f19]/95 border-b border-slate-800/80 backdrop-blur-lg transition-all duration-300 ease-in-out px-8 py-6 space-y-4 shadow-xl">
+            <a href="#" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">作品集</a>
+            <a href="figma3gal.html" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">gallery</a>
+            <a href="0601f3map.html" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">map</a>
+            <a href="figma1gallery.html" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">picture</a>
+            <a href="https://20260527uiux.vercel.app/" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">火車查詢UI</a>
+            <a href="#" class="block text-base font-medium text-slate-300 hover:text-cyan-400 transition-colors">關於我</a>
+            <div class="pt-2 border-t border-slate-800/60">
+                <button class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold tracking-wide shadow-lg shadow-cyan-500/20">
+                    聯絡我
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -87,7 +109,7 @@
                     </a>
                 </div>
 
-                <!-- 作品 2：多功能相簿與地圖導覽整合網頁 (已修改原本的罐頭文案！) -->
+                <!-- 作品 2：多功能相簿與地圖導覽整合網頁 -->
                 <div class="group relative bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:border-purple-500/30 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)]">
                     <div class="absolute -right-10 -top-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl transition-all duration-500 group-hover:scale-150"></div>
                     
@@ -150,7 +172,34 @@
 
     </main>
 
+    <!-- JavaScript 邏輯區 -->
     <script>
+        // 控制手機版導覽列展開/收合
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const icon = document.getElementById('menu-icon');
+            
+            if (menu.classList.contains('hidden')) {
+                // 顯示選單
+                menu.classList.remove('hidden');
+                setTimeout(() => {
+                    menu.classList.remove('opacity-0', '-translate-y-4');
+                }, 10);
+                // 變更圖標並旋轉
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-times', 'rotate-90');
+            } else {
+                // 隱藏選單
+                menu.classList.add('opacity-0', '-translate-y-4');
+                icon.classList.remove('fa-times', 'rotate-90');
+                icon.classList.add('fa-bars');
+                setTimeout(() => {
+                    menu.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        // 控制下方摺疊選單 (FAQ)
         function toggleAccordion(id) {
             const content = document.getElementById(`content-${id}`);
             const arrow = document.getElementById(`arrow-${id}`);
