@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>響應式切換主題版面 - 四種模式</title>
+    <style>
+        /* ==========================================
+           1. 定義四種顏色主題 (使用 CSS 變數)
+        ========================================== */
+        
+        /* 【預設】Dark mode (深底/藍調) */
+        :root {
+            --bg-dark: #121214;
+            --bg-light: #1e1e22;
+            --accent-color: #2563eb; /* 經典藍 */
+            --text-main: #ffffff;
+            --text-sub: #a1a1aa;
+            --card-bg: #1e1e22;
+        }
+
+        /* 【新增】Light mode (亮底/藍調) */
+        :root[data-theme="light"] {
+            --bg-dark: #f4f4f5;
+            --bg-light: #ffffff;
+            --accent-color: #2563eb; /* 經典藍保持一致 */
+            --text-main: #18181b;
+            --text-sub: #71717a;
+            --card-bg: #ffffff;
+        }
+
+        /* Primary mode (亮底/綠調) */
+        :root[data-theme="primary"] {
+            --bg-dark: #f4f4f5;
+            --bg-light: #ffffff;
+            --accent-color: #0d9488; /* 綠色 */
+            --text-main: #18181b;
+            --text-sub: #71717a;
+            --card-bg: #ffffff;
+        }
+
+        /* Purple mode (亮底/紫調) */
+        :root[data-theme="purple"] {
+            --bg-dark: #f4f4f5;
+            --bg-light: #ffffff;
+            --accent-color: #a855f7; /* 紫色 */
+            --text-main: #18181b;
+            --text-sub: #71717a;
+            --card-bg: #ffffff;
+        }
+
+        /* ==========================================
+           2. 基本樣式重設與工具
+        ========================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            transition: background-color 0.3s ease, color 0.3s ease; 
+            padding-bottom: 50px;
+        }
+
+        /* 主題切換控制面板 */
+        .theme-switcher {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 9999;
+            display: flex;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .theme-switcher button {
+            padding: 6px 14px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        /* 內容區塊的圖片/圖表占位符 */
+        .placeholder-img {
+            background: #52525b;
+            width: 100%;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        /* 按鈕樣式 */
+        .btn-more {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* ==========================================
+           3. 網頁版型結構
+        ========================================== */
+        
+        /* 導覽列 */
+        header {
+            background-color: var(--bg-light);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(128,128,128,0.1);
+        }
+
+        /* 主視覺區 (Hero) */
+        .hero {
+            padding: 80px 20px;
+            text-align: center;
+            background: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('https://picsum.photos/1200/400') center/cover;
+            color: white;
+        }
+        .hero h1 { font-size: 2.5rem; letter-spacing: 2px; }
+
+        /* 條列式訊息區 (Desktop 三行、Mobile 垂直) */
+        .info-section {
+            background-color: var(--bg-light);
+            padding: 50px 20px;
+        }
+        .info-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+        .info-item {
+            border-bottom: 1px solid rgba(128,128,128,0.2);
+            padding-bottom: 25px;
+        }
+        .info-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .info-item h3 { margin-bottom: 10px; font-size: 1.25rem; }
+        .info-item p { color: var(--text-sub); margin-bottom: 15px; line-height: 1.6; }
+
+        /* 團隊成員區 (變換背景色的區塊) */
+        .team-section {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 50px 20px;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        .team-section h2 { font-size: 1.75rem; letter-spacing: 1px; }
+        .team-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* 手機預設 1 欄 */
+            gap: 20px;
+            max-width: 1100px;
+            margin: 30px auto 0 auto;
+        }
+        .member-card {
+            border: 1px solid rgba(255,255,255,0.25);
+            padding: 25px 20px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: #e4e4e7;
+            margin: 0 auto 15px auto;
+            background-image: url('https://picsum.photos/100/100');
+            background-size: cover;
+        }
+
+        /* 2x2 精選圖文區 */
+        .features-section {
+            padding: 60px 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .features-section h2 { font-size: 1.75rem; margin-bottom: 10px; }
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* 手機預設 1 欄 */
+            gap: 30px;
+            margin-top: 30px;
+        }
+        .feature-card {
+            text-align: left;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            border: 1px solid rgba(128,128,128,0.1);
+        }
+        .feature-card h3 { margin: 15px 0 10px 0; font-size: 1.2rem; }
+        .feature-card p { color: var(--text-sub); margin-bottom: 20px; line-height: 1.5; }
+
+        /* 頁尾 */
+        footer {
+            background-color: var(--accent-color);
+            color: white;
+            text-align: center;
+            padding: 25px;
+            margin-top: 60px;
+            transition: background-color 0.3s ease;
+        }
+
+        /* ==========================================
+           4. 響應式斷點 (Responsive Breakpoints)
+        ========================================== */
+        
+        /* 平板尺寸 (Tablet: 768px 以上) */
+        @media (min-width: 768px) {
+            .team-grid {
+                grid-template-columns: repeat(2, 1fr); /* 2 欄 */
+            }
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr); /* 2 欄 */
+            }
+        }
+
+        /* 桌機尺寸 (Desktop: 1024px 以上) */
+        @media (min-width: 1024px) {
+            .team-grid {
+                grid-template-columns: repeat(4, 1fr); /* 4 欄並排 */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="theme-switcher">
+        <button onclick="setTheme('light')" style="background:#ffffff; color:#18181b; border:1px solid #18181b;">Light</button>
+        <button onclick="setTheme('dark')" style="background:#121214; color:#ffffff; border:1px solid #ffffff;">Dark</button>
+        <button onclick="setTheme('primary')" style="background:#0d9488; color:#ffffff;">Primary</button>
+        <button onclick="setTheme('purple')" style="background:#a855f7; color:#ffffff;">Purple</button>
+    </div>
+
+    <header>
+        <h2>BRAND NAME</h2>
+    </header>
+
+    <section class="hero">
+        <h1>Welcome</h1>
+    </section>
+
+    <section class="info-section">
+        <div class="info-container">
+            <div class="info-item">
+                <h3>Lorem ipsum dolor sit amet, consectetur adipiscing elit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet. Id diam vel quam elementum pulvinar etiam non.</p>
+                <button class="btn-more">More</button>
+            </div>
+            <div class="info-item">
+                <h3>Lorem ipsum dolor sit amet, consectetur adipiscing elit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet. Id diam vel quam elementum pulvinar etiam non.</p>
+                <button class="btn-more">More</button>
+            </div>
+            <div class="info-item">
+                <h3>Lorem ipsum dolor sit amet, consectetur adipiscing elit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet. Id diam vel quam elementum pulvinar etiam non.</p>
+                <button class="btn-more">More</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="team-section">
+        <h2>CONSECTETUR</h2>
+        <div class="team-grid">
+            <div class="member-card">
+                <div class="avatar"></div>
+                <h4>Lorem ipsum</h4>
+            </div>
+            <div class="member-card">
+                <div class="avatar"></div>
+                <h4>Lorem ipsum</h4>
+            </div>
+            <div class="member-card">
+                <div class="avatar"></div>
+                <h4>Lorem ipsum</h4>
+            </div>
+            <div class="member-card">
+                <div class="avatar"></div>
+                <h4>Lorem ipsum</h4>
+            </div>
+        </div>
+    </section>
+
+    <section class="features-section">
+        <h2>ADIPISCING</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="placeholder-img">圖表 / 趨勢示意</div>
+                <h3>Lorem ipsum dolor sit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet.</p>
+                <button class="btn-more">More</button>
+            </div>
+            <div class="feature-card">
+                <div class="placeholder-img">會議 / 辦公示意</div>
+                <h3>Lorem ipsum dolor sit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet.</p>
+                <button class="btn-more">More</button>
+            </div>
+            <div class="feature-card">
+                <div class="placeholder-img">電腦螢幕示意</div>
+                <h3>Lorem ipsum dolor sit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet.</p>
+                <button class="btn-more">More</button>
+            </div>
+            <div class="feature-card">
+                <div class="placeholder-img">辦公桌示意</div>
+                <h3>Lorem ipsum dolor sit</h3>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tellus id interdum velit laoreet.</p>
+                <button class="btn-more">More</button>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>© BRAND NAME. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function setTheme(themeName) {
+            if(themeName === 'dark') {
+                // 移除 data-theme 屬性即回歸預設的 Dark Mode
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                // 設定對應的 data-theme（light / primary / purple）
+                document.documentElement.setAttribute('data-theme', themeName);
+            }
+        }
+    </script>
+</body>
+</html>
