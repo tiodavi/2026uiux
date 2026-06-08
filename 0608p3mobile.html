@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式 Mockup 生成器 (全方位 3D 自定義版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* ==========================================================================
+           1. 基礎版面配置
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 左側：控制台（稍微加寬以容納滑桿） */
+        .control-panel {
+            width: 360px;
+            background-color: #ffffff;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        .control-panel h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 8px;
+        }
+
+        .section-subtitle {
+            font-size: 13px;
+            color: #777;
+            margin-top: -10px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input[type="text"], .form-group select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        /* 滑桿群組專用樣式 */
+        .slider-group {
+            background: #fdfdfd;
+            border: 1px solid #eef0f2;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+        .slider-item input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        /* 物件管理區 */
+        .component-manager {
+            background-color: #f8f9fa;
+            border: 1px dashed #bbb;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .component-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            border: 1px solid #eee;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .btn-add-item {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .btn-export {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 6px rgba(0,102,204,0.2);
+        }
+        .btn-export:hover { background-color: #0052a3; }
+
+        /* 右側：主畫布預覽區 */
+        .preview-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            background-color: #e5e5e5;
+            overflow: auto;
+        }
+
+        /* ==========================================================================
+           2. 被截圖的主舞台與背景牆
+           ========================================================================== */
+        .showcase-stage {
+            width: 1050px; /* 稍微拓寬舞台，容納可能外推的手機 */
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            background-color: #f5f5f7;
+            border-radius: 12px;
+        }
+
+        .left-canvas {
+            width: 600px;
+            height: 650px;
+            background: radial-gradient(circle at 50% 50%, #4a287c 0%, #1a0833 100%);
+            border: 2px solid #0066cc;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            perspective: 1200px; /* 增強 3D 縱深感 */
+        }
+
+        /* 核心改動：改由 JS 全動態控制 style 屬性 */
+        .slanted-phone {
+            position: absolute;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .watermark {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+            font-weight: 300;
+        }
+
+        .right-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .right-select-box {
+            border: 2px solid #0066cc;
+            position: relative;
+            padding: 2px;
+        }
+
+        .anchor { width: 8px; height: 8px; background-color: #fff; border: 2px solid #0066cc; position: absolute; }
+        .top-left { top: -5px; left: -5px; } .top-right { top: -5px; right: -5px; }
+        .bottom-left { bottom: -5px; left: -5px; } .bottom-right { bottom: -5px; right: -5px; }
+
+        .size-tag {
+            background-color: #0066cc; color: white; padding: 6px 14px; border-radius: 6px; font-size: 14px; font-weight: bold;
+        }
+
+        /* ==========================================================================
+           3. 手機內部 UI 完整樣式
+           ========================================================================== */
+        .phone-mockup {
+            width: 375px;
+            height: 812px;
+            background-color: #170d2c;
+            border: 11px solid #222;
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar { height: 44px; padding: 0 32px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 12px; z-index: 10; }
+        .dynamic-island { width: 110px; height: 30px; background-color: #000; border-radius: 20px; position: absolute; top: 7px; left: 50%; transform: translateX(-50%); }
+        
+        .app-content { flex: 1; padding: 16px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .app-content::-webkit-scrollbar { display: none; } 
+
+        .header-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; }
+        .welcome-text { color: #8c82a6; font-size: 14px; }
+        .ui-username { color: #fff; font-size: 24px; font-weight: bold; margin-top: 4px; }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, #7b22ec 0%, #da2fa6 100%);
+            color: #fff; border: none; border-radius: 20px; padding: 10px 24px; font-size: 13px; font-weight: 600;
+        }
+
+        .grid-container { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+        .card { background: linear-gradient(180deg, #322353 0%, #22153d 100%); border: 1px solid #41326a; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-large { grid-row: span 2; min-height: 220px; }
+        .audio-wave { display: flex; justify-content: center; align-items: center; gap: 6px; height: 60px; margin: 15px 0; }
+        .wave-bar { width: 6px; background: linear-gradient(180deg, #da2fa6 0%, #7b22ec 100%); border-radius: 3px; }
+        .bar-1 { height: 20px; } .bar-2 { height: 35px; } .bar-3 { height: 55px; } .bar-4 { height: 30px; } .bar-5 { height: 18px; }
+        .card-text { color: #b0a4d4; font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+        .card-large .btn-gradient { width: 100%; padding: 8px 0; text-align: center; }
+        .card-small { min-height: 103px; }
+        .card-small-title { color: #fff; font-size: 13px; font-weight: 500; }
+        .card-small-sub { color: #8c82a6; font-size: 11px; }
+
+        .section-title-bar { display: flex; justify-content: space-between; align-items: center; }
+        .section-title { color: #fff; font-size: 18px; font-weight: bold; }
+        .section-more { color: #8c82a6; font-size: 12px; }
+
+        .list-container { display: flex; flex-direction: column; gap: 12px; }
+        .list-item { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 30px; border: 1px solid #4e3585; background: radial-gradient(circle at 70% 20%, #462b78 0%, #20133c 100%); }
+        .list-icon-circle { width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 12px; background: linear-gradient(135deg, #2b1a4a 0%, #4a3375 100%); border: 1px solid #63479e; }
+        .list-text { color: #ded9f0; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h2>客製化參數設定</h2>
+        
+        <div class="form-group">
+            <label for="input-name">使用者名稱 (Username)</label>
+            <input type="text" id="input-name" value="Malesuada">
+        </div>
+
+        <div class="form-group">
+            <label for="input-watermark">右下角設計師簽名</label>
+            <input type="text" id="input-watermark" value="Design by Evie Lu">
+        </div>
+
+        <div class="form-group">
+            <label for="select-theme">左側背景主題</label>
+            <select id="select-theme">
+                <option value="midnight">經典深紫（原版）</option>
+                <option value="ocean">極光深藍</option>
+                <option value="sunset">落日奢華紅</option>
+                <option value="forest">賽博龐克綠</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="select-accent">主元件漸層色系</label>
+            <select id="select-accent">
+                <option value="magenta-purple">粉紫漸層（原版）</option>
+                <option value="cyan-blue">青藍漸層</option>
+                <option value="orange-red">橙紅漸層</option>
+                <option value="gold-yellow">金黃漸層</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>手機內部物件管理</label>
+            <div class="component-manager">
+                <div id="control-component-list"></div>
+                <select id="select-new-component" style="margin-top: 10px; width: 100%;">
+                    <option value="grid-cards">🎵 音樂格狀雙卡片</option>
+                    <option value="section-title">📝 區段標題 (Lorem ipsum)</option>
+                    <option value="list-item">💊 圓角膠囊清單項目</option>
+                </select>
+                <button class="btn-add-item" onclick="addComponent()">➕ 新增物件到手機</button>
+            </div>
+        </div>
+
+        <h2>左側手機 3D 姿勢調整</h2>
+        <span class="section-subtitle">即時調整左邊畫布中兩支手機的空間排版</span>
+
+        <div class="form-group">
+            <label>📱 前方手機 (Phone 1)</label>
+            <div class="slider-group">
+                <div class="slider-item">
+                    <div class="slider-label"><span>靠左/右 (X 軸)</span><span id="v-p1-x">30px</span></div>
+                    <input type="range" id="p1-x" min="-150" max="400" value="30">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>靠上/下 (Y 軸)</span><span id="v-p1-y">-20px</span></div>
+                    <input type="range" id="p1-y" min="-200" max="300" value="-20">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>大小比例 (Scale)</span><span id="v-p1-scale">0.65</span></div>
+                    <input type="range" id="p1-scale" min="0.4" max="1" step="0.05" value="0.65">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>前後翻轉 (Rotate X)</span><span id="v-p1-rx">25°</span></div>
+                    <input type="range" id="p1-rx" min="-90" max="90" value="25">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>左右轉向 (Rotate Y)</span><span id="v-p1-ry">-35°</span></div>
+                    <input type="range" id="p1-ry" min="-90" max="90" value="-35">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>平面旋轉 (Rotate Z)</span><span id="v-p1-rz">20°</span></div>
+                    <input type="range" id="p1-rz" min="-180" max="180" value="20">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label>📱 後方手機 (Phone 2)</label>
+            <div class="slider-group">
+                <div class="slider-item">
+                    <div class="slider-label"><span>靠左/右 (X 軸)</span><span id="v-p2-x">210px</span></div>
+                    <input type="range" id="p2-x" min="-150" max="400" value="210">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>靠上/下 (Y 軸)</span><span id="v-p2-y">-110px</span></div>
+                    <input type="range" id="p2-y" min="-200" max="300" value="-110">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>大小比例 (Scale)</span><span id="v-p2-scale">0.65</span></div>
+                    <input type="range" id="p2-scale" min="0.4" max="1" step="0.05" value="0.65">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>前後翻轉 (Rotate X)</span><span id="v-p2-rx">25°</span></div>
+                    <input type="range" id="p2-rx" min="-90" max="90" value="25">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>左右轉向 (Rotate Y)</span><span id="v-p2-ry">-35°</span></div>
+                    <input type="range" id="p2-ry" min="-90" max="90" value="-35">
+                </div>
+                <div class="slider-item">
+                    <div class="slider-label"><span>平面旋轉 (Rotate Z)</span><span id="v-p2-rz">20°</span></div>
+                    <input type="range" id="p2-rz" min="-180" max="180" value="20">
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-export" onclick="exportToImage()">📸 產出客製化圖片 (PNG)</button>
+    </div>
+
+    <div class="preview-area">
+        <div class="showcase-stage" id="capture-target">
+            
+            <div class="left-canvas" id="canvas-bg">
+                
+                <div class="slanted-phone" id="phone1" style="z-index: 2;">
+                    <div class="phone-mockup">
+                        <div class="dynamic-island"></div>
+                        <div class="status-bar"><span>9:41</span><span>📶🔋</span></div>
+                        <div class="app-content" id="phone-content-left1"></div>
+                    </div>
+                </div>
+
+                <div class="slanted-phone" id="phone2" style="z-index: 1;">
+                    <div class="phone-mockup">
+                        <div class="dynamic-island"></div>
+                        <div class="status-bar"><span>9:41</span><span>📶🔋</span></div>
+                        <div class="app-content" id="phone-content-left2"></div>
+                    </div>
+                </div>
+
+                <div class="watermark" id="watermark-display">Design by Evie Lu</div>
+            </div>
+
+            <div class="right-display">
+                <div class="right-select-box">
+                    <div class="anchor top-left"></div><div class="anchor top-right"></div><div class="anchor bottom-left"></div><div class="anchor bottom-right"></div>
+                    
+                    <div class="phone-mockup">
+                        <div class="dynamic-island"></div>
+                        <div class="status-bar"><span>9:41</span><span>📶🔋</span></div>
+                        <div class="app-content" id="phone-content-right"></div>
+                    </div>
+                </div>
+                <div class="size-tag">410 × 833</div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 初始化內部物件陣列
+        let components = [
+            { id: 1, type: 'grid-cards' },
+            { id: 2, type: 'section-title' },
+            { id: 3, type: 'list-item' },
+            { id: 4, type: 'list-item' }
+        ];
+        let nextId = 5;
+
+        // 快取基本控制項
+        const inputName = document.getElementById('input-name');
+        const inputWatermark = document.getElementById('input-watermark');
+        const selectTheme = document.getElementById('select-theme');
+        const selectAccent = document.getElementById('select-accent');
+        const watermarkDisplay = document.getElementById('watermark-display');
+        const canvasBg = document.getElementById('canvas-bg');
+
+        // 核心渲染函式
+        function renderAll() {
+            const username = inputName.value || 'Username';
+            const accent = selectAccent.value;
+            
+            let bgStyle = 'linear-gradient(135deg, #7b22ec 0%, #da2fa6 100%)';
+            if (accent === 'cyan-blue') bgStyle = 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)';
+            else if (accent === 'orange-red') bgStyle = 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)';
+            else if (accent === 'gold-yellow') bgStyle = 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)';
+
+            // 更新控制面板列表
+            const ctrlList = document.getElementById('control-component-list');
+            ctrlList.innerHTML = '';
+            components.forEach((comp, index) => {
+                let typeName = '';
+                if(comp.type === 'grid-cards') typeName = '🎵 音樂雙卡片';
+                if(comp.type === 'section-title') typeName = '📝 區段標題';
+                if(comp.type === 'list-item') typeName = '💊 圓角膠囊項目';
+                ctrlList.innerHTML += `
+                    <div class="component-list-item">
+                        <span>${index + 1}. ${typeName}</span>
+                        <button class="btn-delete" onclick="deleteComponent(${comp.id})">刪除</button>
+                    </div>
+                `;
+            });
+
+            // 拼裝手機內部 HTML 模板
+            let phoneHTML = `
+                <div class="header-section">
+                    <div><div class="welcome-text">Hello,</div><div class="ui-username">${username}</div></div>
+                    <button class="btn-gradient" style="background: ${bgStyle}">Button</button>
+                </div>
+            `;
+
+            components.forEach(comp => {
+                if (comp.type === 'grid-cards') {
+                    phoneHTML += `
+                        <div class="grid-container">
+                            <div class="card card-large">
+                                <div class="icon-music">🎵</div>
+                                <div class="audio-wave">
+                                    <div class="wave-bar bar-1" style="background: ${bgStyle}"></div>
+                                    <div class="wave-bar bar-2" style="background: ${bgStyle}"></div>
+                                    <div class="wave-bar bar-3" style="background: ${bgStyle}"></div>
+                                    <div class="wave-bar bar-4" style="background: ${bgStyle}"></div>
+                                    <div class="wave-bar bar-5" style="background: ${bgStyle}"></div>
+                                </div>
+                                <div>
+                                    <div class="card-text">Lorem ipsum dolor sit amet...</div>
+                                    <button class="btn-gradient" style="background: ${bgStyle}">Button</button>
+                                </div>
+                            </div>
+                            <div class="card card-small"><div>💬</div><div><div class="card-small-title">Lorem ipsum</div><div class="card-small-sub">Lorem</div></div></div>
+                            <div class="card card-small"><div>🎵</div><div><div class="card-small-title">Lorem ipsum</div><div class="card-small-sub">Lorem</div></div></div>
+                        </div>
+                    `;
+                } else if (comp.type === 'section-title') {
+                    phoneHTML += `
+                        <div class="section-title-bar">
+                            <h2 class="section-title">Lorem ipsum</h2><span class="section-more">ipsum</span>
+                        </div>
+                    `;
+                } else if (comp.type === 'list-item') {
+                    phoneHTML += `
+                        <div class="list-container">
+                            <div class="list-item">
+                                <div class="list-icon-circle">🎵</div><div class="list-text">Lorem ipsum dolor sit amet</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('phone-content-left1').innerHTML = phoneHTML;
+            document.getElementById('phone-content-left2').innerHTML = phoneHTML;
+            document.getElementById('phone-content-right').innerHTML = phoneHTML;
+
+            // 每當物件長度改變，主動調用一次 3D 姿勢同步重新整理
+            apply3DTransforms();
+        }
+
+        // ================= 全新：應用 3D 參數與滑桿數值即時更新邏輯 =================
+        function apply3DTransforms() {
+            // 手機 1 參數取得與應用
+            const p1_x = document.getElementById('p1-x').value;
+            const p1_y = document.getElementById('p1-y').value;
+            const p1_scale = document.getElementById('p1-scale').value;
+            const p1_rx = document.getElementById('p1-rx').value;
+            const p1_ry = document.getElementById('p1-ry').value;
+            const p1_rz = document.getElementById('p1-rz').value;
+
+            document.getElementById('v-p1-x').textContent = p1_x + 'px';
+            document.getElementById('v-p1-y').textContent = p1_y + 'px';
+            document.getElementById('v-p1-scale').textContent = p1_scale;
+            document.getElementById('v-p1-rx').textContent = p1_rx + '°';
+            document.getElementById('v-p1-ry').textContent = p1_ry + '°';
+            document.getElementById('v-p1-rz').textContent = p1_rz + '°';
+
+            document.getElementById('phone1').style.left = `${p1_x}px`;
+            document.getElementById('phone1').style.top = `${p1_y}px`;
+            document.getElementById('phone1').style.transform = `scale(${p1_scale}) rotateX(${p1_rx}deg) rotateY(${p1_ry}deg) rotateZ(${p1_rz}deg)`;
+
+            // 手機 2 參數取得與應用
+            const p2_x = document.getElementById('p2-x').value;
+            const p2_y = document.getElementById('p2-y').value;
+            const p2_scale = document.getElementById('p2-scale').value;
+            const p2_rx = document.getElementById('p2-rx').value;
+            const p2_ry = document.getElementById('p2-ry').value;
+            const p2_rz = document.getElementById('p2-rz').value;
+
+            document.getElementById('v-p2-x').textContent = p2_x + 'px';
+            document.getElementById('v-p2-y').textContent = p2_y + 'px';
+            document.getElementById('v-p2-scale').textContent = p2_scale;
+            document.getElementById('v-p2-rx').textContent = p2_rx + '°';
+            document.getElementById('v-p2-ry').textContent = p2_ry + '°';
+            document.getElementById('v-p2-rz').textContent = p2_rz + '°';
+
+            document.getElementById('phone2').style.left = `${p2_x}px`;
+            document.getElementById('phone2').style.top = `${p2_y}px`;
+            document.getElementById('phone2').style.transform = `scale(${p2_scale}) rotateX(${p2_rx}deg) rotateY(${p2_ry}deg) rotateZ(${p2_rz}deg)`;
+        }
+
+        // 綁定所有滑桿的 input 事件，達成拖拽時極速流暢變更
+        const allSliders = document.querySelectorAll('.slider-group input[type="range"]');
+        allSliders.forEach(slider => {
+            slider.addEventListener('input', apply3DTransforms);
+        });
+
+        // 增刪組件控制
+        function addComponent() {
+            const select = document.getElementById('select-new-component');
+            components.push({ id: nextId++, type: select.value });
+            renderAll();
+        }
+
+        function deleteComponent(id) {
+            components = components.filter(comp => comp.id !== id);
+            renderAll();
+        }
+
+        // 監聽文字、背景
+        inputName.addEventListener('input', renderAll);
+        inputWatermark.addEventListener('input', (e) => { watermarkDisplay.textContent = e.target.value || 'Design'; });
+        selectAccent.addEventListener('change', renderAll);
+        selectTheme.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === 'midnight') canvasBg.style.background = 'radial-gradient(circle at 50% 50%, #4a287c 0%, #1a0833 100%)';
+            else if (val === 'ocean') canvasBg.style.background = 'radial-gradient(circle at 50% 50%, #1a5276 0%, #0b1d28 100%)';
+            else if (val === 'sunset') canvasBg.style.background = 'radial-gradient(circle at 50% 50%, #78281f 0%, #2c0c0c 100%)';
+            else if (val === 'forest') canvasBg.style.background = 'radial-gradient(circle at 50% 50%, #145a32 0%, #051a0e 100%)';
+        });
+        
+        window.onload = renderAll;
+
+        // 圖片匯出
+        function exportToImage() {
+            const target = document.getElementById('capture-target');
+            const btn = document.querySelector('.btn-export');
+            btn.textContent = '正在產生圖片中...';
+            btn.disabled = true;
+
+            html2canvas(target, {
+                useCORS: true,
+                scale: 2, 
+                backgroundColor: '#f5f5f7'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `3D-Custom-Mockup-${Date.now()}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+
+                btn.textContent = '📸 產出客製化圖片 (PNG)';
+                btn.disabled = false;
+            }).catch(error => {
+                console.error(error);
+                btn.textContent = '📸 產出客製化圖片 (PNG)';
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
