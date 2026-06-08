@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D 玻璃 Icon 設計產生器 (高精細形狀 & 8大物件版)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #090911;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, system-ui, sans-serif;
+            padding: 20px;
+        }
+
+        .workspace {
+            display: flex;
+            background: #141426;
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 30px 70px rgba(0,0,0,0.6);
+            gap: 40px;
+            max-width: 1100px;
+            width: 100%;
+            align-items: center;
+        }
+
+        .control-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: #1c1c35;
+            padding: 20px;
+            border-radius: 16px;
+            max-height: 720px;
+            overflow-y: auto;
+        }
+
+        h2 { font-size: 1rem; color: #a25efc; border-bottom: 1px solid #2d2d48; padding-bottom: 6px; margin-bottom: 4px; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; }
+        label { font-size: 0.8rem; color: #a0a0c0; }
+        .val-display { font-size: 0.8rem; color: #92E7FF; font-family: monospace; }
+
+        select {
+            width: 100%; background: #252547; border: 1px solid #444470; color: #fff; padding: 8px 10px; border-radius: 8px; cursor: pointer; outline: none; font-size: 0.85rem;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .theme-btn {
+            height: 35px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.1); }
+        .theme-btn.active { border-color: #fff; box-shadow: 0 0 10px #fff; }
+
+        input[type="range"] { width: 100%; accent-color: #a25efc; cursor: pointer; }
+        input[type="color"] { width: 100%; height: 35px; border: none; border-radius: 6px; background: none; cursor: pointer; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 5px; }
+        .toggle-btn {
+            flex: 1; background: #252547; color: #fff; border: 1px solid #444470; padding: 10px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; transition: 0.2s;
+        }
+        .toggle-btn.active { background: #a25efc; border-color: #a25efc; font-weight: bold; }
+
+        .export-btn {
+            background: linear-gradient(135deg, #a25efc, #681bc6);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(162, 94, 252, 0.4);
+        }
+        .export-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(162, 94, 252, 0.6); }
+
+        .preview-area {
+            flex: 1.1;
+            background: #05050a;
+            border-radius: 20px;
+            width: 450px;
+            height: 450px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .preview-area.checkboard {
+            background-color: #e0e0e0;
+            background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .canvas-container { margin: auto !important; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+</head>
+<body>
+
+<div class="workspace">
+    <div class="control-panel">
+        <h2>Figma 物件選擇</h2>
+        <div class="control-group">
+            <select id="iconSelector">
+                <option value="bell">🔔 智慧通知鈴鐺</option>
+                <option value="sphere">🔮 圓潤發光球體</option>
+                <option value="gear">⚙️ 精密工業齒輪 (重構優化)</option>
+                <option value="diamond">💎 經典切割鑽石 (重構優化)</option>
+                <option value="heart">💖 圓潤流線愛心 (全新)</option>
+                <option value="star">⭐ 質感發光五角星 (全新)</option>
+                <option value="chat">💬 現代微光對話框 (全新)</option>
+                <option value="bolt">⚡ 能量速度閃電 (全新)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>快速調色盤 (Figma 預設組)</label>
+            <div class="theme-grid" id="themeGrid"></div>
+        </div>
+
+        <h2>1. 放射漸層與光源中心 (Fill)</h2>
+        <div style="display: flex; gap: 10px;">
+            <div class="control-group" style="flex:1;">
+                <label>起點 (光源)</label>
+                <input type="color" id="colorStart" value="#92E7FF">
+            </div>
+            <div class="control-group" style="flex:1;">
+                <label>終點 (暗處)</label>
+                <input type="color" id="colorEnd" value="#F760FA">
+            </div>
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>光源左右偏移 (Light X)</label><span class="val-display" id="focalXVal">-0.2</span></div>
+            <input type="range" id="focalX" min="-0.5" max="0.5" step="0.05" value="-0.2">
+        </div>
+
+        <h2>2. 邊框與混合模式 (Stroke / Blend)</h2>
+        <div class="control-group">
+            <div class="control-row"><label>邊框厚度 (Stroke Width)</label><span class="val-display" id="thickVal">4</span></div>
+            <input type="range" id="glassThickness" min="1" max="12" step="1" value="4">
+        </div>
+        <div class="control-group">
+            <label>高光層混合模式 (Blend Mode)</label>
+            <select id="blendSelector">
+                <option value="screen">Screen (網頁防死白推薦)</option>
+                <option value="lighten">Lighten (精準還原 Figma)</option>
+                <option value="source-over">Normal (純白覆蓋)</option>
+                <option value="overlay">Overlay (重疊融合)</option>
+            </select>
+        </div>
+
+        <h2>3. 獨立陰影設定 (Effects)</h2>
+        <div class="control-group">
+            <label>陰影發光色彩 (Drop Shadow Color)</label>
+            <input type="color" id="shadowColor" value="#A25EFC">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div class="control-group" style="flex:1;">
+                <div class="control-row"><label>陰影模糊</label><span class="val-display" id="blurVal">20</span></div>
+                <input type="range" id="shadowBlur" min="5" max="50" step="1" value="20">
+            </div>
+            <div class="control-group" style="flex:1;">
+                <div class="control-row"><label>陰影濃度</label><span class="val-display" id="alphaVal">0.5</span></div>
+                <input type="range" id="shadowAlpha" min="0.1" max="1.0" step="0.05" value="0.5">
+            </div>
+        </div>
+
+        <h2>4. 畫布環境設定</h2>
+        <div class="control-group">
+            <label>環境預覽切換</label>
+            <div class="btn-row">
+                <button class="toggle-btn active" id="bgSolidBtn">純色卡片</button>
+                <button class="toggle-btn" id="bgCheckBtn">Figma 透明格</button>
+            </div>
+        </div>
+        <div class="control-group" id="cardColorGroup">
+            <label>自訂卡片顏色</label>
+            <input type="color" id="cardColor" value="#DECCFC">
+        </div>
+
+        <button class="export-btn" id="exportBtn">💾 匯出超清透明去背 PNG</button>
+    </div>
+
+    <div class="preview-area" id="previewArea">
+        <canvas id="canvas2d" width="400" height="400"></canvas>
+    </div>
+</div>
+
+<script>
+    const figmaThemes = [
+        { main: '#92E7FF', sub: '#F760FA', bg: '#DECCFC', shadow: '#A25EFC' },
+        { main: '#A2FF92', sub: '#00E5FF', bg: '#E5F2FA', shadow: '#00E5FF' },
+        { main: '#F7FF92', sub: '#11CAA0', bg: '#F0F9F1', shadow: '#11CAA0' },
+        { main: '#FFEB92', sub: '#FF60B2', bg: '#FFF1F5', shadow: '#FF60B2' },
+        { main: '#F2D2FF', sub: '#9400D3', bg: '#E5F2FA', shadow: '#9400D3' }
+    ];
+
+    const canvas = new fabric.Canvas('canvas2d', { backgroundColor: 'transparent', selection: false });
+
+    // 背景卡片
+    const bgCard = new fabric.Rect({
+        left: 200, top: 200, originX: 'center', originY: 'center',
+        width: 300, height: 300, rx: 40, ry: 40,
+        fill: '#DECCFC', selectable: false, hoverCursor: 'default'
+    });
+    canvas.add(bgCard);
+
+    let iconGroup = null;
+
+    function hexToRgba(hex, alpha) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(char => char + char).join('');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // 重構與新增的 8 大向量路徑庫
+    function getShapePath(type) {
+        switch(type) {
+            case 'sphere': 
+                return new fabric.Circle({ radius: 75, originX: 'center', originY: 'center' });
+            
+            case 'bell': 
+                return new fabric.Path('M 0,-65 C 25,-65 42,-35 42,5 L 52,32 C 52,40 42,45 0,45 C -42,45 -52,40 -52,32 L -42,5 C -42,-35 -25,-65 0,-65 Z', { originX: 'center', originY: 'center' });
+            
+            case 'gear': // 🛠️ 優化版：內縮平滑、比例精準的擬真 8 齒輪
+                return new fabric.Path('M 0,-30 C -16,-30 -30,-16 -30,0 C -30,16 -16,30 0,30 C 16,30 30,16 30,0 C 30,-16 16,-30 0,-30 Z M 0,-70 L 14,-70 L 18,-50 C 25,-47 31,-43 37,-37 L 53,-47 L 63,-37 L 53,-21 C 57,-15 61,-8 63,-1 L 73,6 L 70,20 L 51,20 C 47,28 42,35 36,41 L 44,59 L 32,68 L 16,54 C 11,57 5,59 -1,60 L -7,70 L -21,68 L -22,50 C -29,47 -36,42 -42,36 L -60,44 L -69,32 L -55,16 C -58,11 -60,5 -61,-1 L -71,-7 L -68,-21 L -49,-22 C -45,-30 -40,-37 -34,-43 L -42,-61 L -30,-70 L -15,-56 C -10,-59 -4,-61 2,-62 Z', { originX: 'center', originY: 'center' });
+            
+            case 'diamond': // 🛠️ 優化版：經典鑽石多面切割感
+                return new fabric.Path('M 0,-65 L 40,-65 L 68,-25 L 0,65 L -68,-25 L -40,-65 Z M -40,-65 L -18,-25 L 0,-65 L 18,-25 L 40,-65 M -68,-25 L 68,-25', { originX: 'center', originY: 'center' });
+            
+            case 'heart': // 🆕 全新心形路徑
+                return new fabric.Path('M 0,-45 C 15,-75 65,-70 65,-25 C 65,15 20,45 0,65 C -20,45 -65,15 -65,-25 C -65,-70 -15,-75 0,-45 Z', { originX: 'center', originY: 'center' });
+            
+            case 'star': // 🆕 全新圓潤五角星
+                return new fabric.Path('M 0,-70 L 18,-23 L 68,-20 L 29,12 L 42,62 L 0,35 L -42,62 L -29,12 L -68,-20 L -18,-23 Z', { originX: 'center', originY: 'center' });
+            
+            case 'chat': // 🆕 全新對話框路泡泡
+                return new fabric.Path('M -55,-50 C -55,-50 55,-50 55,-50 C 65,-50 65,-35 65,-35 C 65,-35 65,20 65,20 C 65,35 50,35 50,35 C 50,35 15,35 15,35 L -15,58 L -15,35 C -15,35 -55,35 -55,35 C -65,35 -65,20 -65,20 L -65,-35 C -65,-50 -55,-50 -55,-50 Z', { originX: 'center', originY: 'center' });
+            
+            case 'bolt': // 🆕 全新流線科技閃電
+                return new fabric.Path('M 15,-65 L -40,-5 L -5,5 L -25,65 L 45,0 L 5,-5 Z', { originX: 'center', originY: 'center' });
+        }
+    }
+
+    // 核心渲染邏輯 (完美對齊 Figma)
+    function drawFigmaIcon() {
+        const type = document.getElementById('iconSelector').value;
+        const cStart = document.getElementById('colorStart').value;
+        const cEnd = document.getElementById('colorEnd').value;
+        const thickness = parseFloat(document.getElementById('glassThickness').value);
+        const bMode = document.getElementById('blendSelector').value;
+        
+        const sColor = document.getElementById('shadowColor').value;
+        const sBlur = parseFloat(document.getElementById('shadowBlur').value);
+        const sAlpha = parseFloat(document.getElementById('shadowAlpha').value);
+        const fX = parseFloat(document.getElementById('focalX').value);
+
+        if (iconGroup) canvas.remove(iconGroup);
+
+        // 🟢 1. 主體層 (放射漸層)
+        const mainBase = getShapePath(type);
+        const radialGradient = new fabric.Gradient({
+            type: 'radial',
+            coords: {
+                x1: mainBase.width * fX, 
+                y1: -mainBase.height * 0.2,
+                r1: 0,
+                x2: mainBase.width * (fX * 0.5),
+                y2: -mainBase.height * 0.1,
+                r2: mainBase.width * 0.8
+            },
+            colorStops: [
+                { offset: 0, color: cStart },
+                { offset: 0.6, color: hexToRgba(cStart, 0.85) },
+                { offset: 1, color: cEnd }
+            ]
+        });
+        
+        mainBase.set({
+            fill: radialGradient,
+            stroke: 'transparent',
+            shadow: new fabric.Shadow({
+                color: hexToRgba(sColor, sAlpha),
+                blur: sBlur,
+                offsetX: 0,
+                offsetY: 12
+            })
+        });
+
+        // 🟢 2. 多層次折射霧面層
+        const glassGlaze = getShapePath(type);
+        glassGlaze.set({ fill: 'transparent' });
+        const glazeGradient = new fabric.Gradient({
+            type: 'linear',
+            coords: { x1: -glassGlaze.width/2, y1: -glassGlaze.height/2, x2: glassGlaze.width/2, y2: glassGlaze.height/2 },
+            colorStops: [
+                { offset: 0, color: 'rgba(255, 255, 255, 0.25)' },
+                { offset: 1, color: 'rgba(0, 0, 0, 0.15)' }
+            ]
+        });
+        glassGlaze.set('fill', glazeGradient);
+
+        // 🟢 3. 玻璃高光邊框層
+        const glassBorder = getShapePath(type);
+        glassBorder.set({ fill: 'transparent', strokeWidth: thickness });
+        const borderGradient = new fabric.Gradient({
+            type: 'linear',
+            coords: { x1: -glassBorder.width/2, y1: -glassBorder.height/2, x2: glassBorder.width/2, y2: glassBorder.height/2 },
+            colorStops: [
+                { offset: 0, color: 'rgba(255, 255, 255, 0.75)' },
+                { offset: 0.5, color: 'rgba(255, 255, 255, 0.15)' },
+                { offset: 1, color: hexToRgba(cStart, 0.6) }
+            ]
+        });
+        glassBorder.set('stroke', borderGradient);
+
+        // 🟢 4. 彎月亮點高光層
+        const moonHighlight = new fabric.Path('M -45,-35 C -15,-60 25,-55 45,-25 C 32,-42 -2,-48 -32,-30 Z', {
+            originX: 'center', originY: 'center', stroke: 'transparent', opacity: 0.75,
+            globalCompositeOperation: bMode
+        });
+
+        const highlightGradient = new fabric.Gradient({
+            type: 'linear',
+            coords: { x1: 0, y1: -25, x2: 0, y2: 10 },
+            colorStops: [
+                { offset: 0, color: 'rgba(255, 255, 255, 0.85)' },
+                { offset: 1, color: 'rgba(255, 255, 255, 0)' }
+            ]
+        });
+        moonHighlight.set('fill', highlightGradient);
+
+        // 依據不同形狀輪廓調整彎月高光的位置與縮放比例
+        if (type === 'sphere' || type === 'heart') {
+            moonHighlight.set({ scaleX: 1.1, scaleY: 1.1, top: -38, left: -4 });
+        } else if (type === 'bell' || type === 'chat') {
+            moonHighlight.set({ scaleX: 0.8, scaleY: 0.8, top: -45, left: 0 });
+        } else if (type === 'star') {
+            moonHighlight.set({ scaleX: 0.7, scaleY: 0.7, top: -42, left: 0 });
+        } else if (type === 'bolt') {
+            moonHighlight.set({ scaleX: 0.6, scaleY: 0.6, top: -35, left: 10 });
+        } else {
+            moonHighlight.set({ scaleX: 0.9, scaleY: 0.9, top: -35, left: -2 });
+        }
+
+        // 打包與定位
+        iconGroup = new fabric.Group([mainBase, glassGlaze, glassBorder, moonHighlight], {
+            left: 200, top: 200, originX: 'center', originY: 'center', selectable: true
+        });
+
+        canvas.add(iconGroup);
+        canvas.renderAll();
+    }
+
+    // UI 控制項連動設定
+    const previewArea = document.getElementById('previewArea');
+    const cardColorGroup = document.getElementById('cardColorGroup');
+    const bgSolidBtn = document.getElementById('bgSolidBtn');
+    const bgCheckBtn = document.getElementById('bgCheckBtn');
+
+    bgSolidBtn.onclick = () => {
+        bgSolidBtn.classList.add('active');
+        bgCheckBtn.classList.remove('active');
+        previewArea.classList.remove('checkboard');
+        cardColorGroup.style.display = 'block';
+        bgCard.set('visible', true);
+        canvas.renderAll();
+    };
+
+    bgCheckBtn.onclick = () => {
+        bgCheckBtn.classList.add('active');
+        bgSolidBtn.classList.remove('active');
+        previewArea.classList.add('checkboard');
+        cardColorGroup.style.display = 'none';
+        bgCard.set('visible', false);
+        canvas.renderAll();
+    };
+
+    const themeGrid = document.getElementById('themeGrid');
+    figmaThemes.forEach((theme, index) => {
+        const btn = document.createElement('div');
+        btn.className = 'theme-btn';
+        btn.style.background = `linear-gradient(135deg, ${theme.main}, ${theme.sub})`;
+        btn.onclick = () => {
+            document.getElementById('colorStart').value = theme.main;
+            document.getElementById('colorEnd').value = theme.sub;
+            document.getElementById('shadowColor').value = theme.shadow;
+            document.getElementById('cardColor').value = theme.bg;
+            bgCard.set('fill', theme.bg);
+            updateUI();
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        };
+        themeGrid.appendChild(btn);
+        if(index === 0) btn.classList.add('active');
+    });
+
+    function updateUI() {
+        bgCard.set('fill', document.getElementById('cardColor').value);
+        document.getElementById('thickVal').innerText = document.getElementById('glassThickness').value;
+        document.getElementById('blurVal').innerText = document.getElementById('shadowBlur').value;
+        document.getElementById('alphaVal').innerText = document.getElementById('shadowAlpha').value;
+        document.getElementById('focalXVal').innerText = document.getElementById('focalX').value;
+        drawFigmaIcon();
+    }
+
+    document.getElementById('iconSelector').onchange = drawFigmaIcon;
+    document.getElementById('blendSelector').onchange = drawFigmaIcon;
+    document.querySelectorAll('input').forEach(el => el.oninput = updateUI);
+
+    // 一鍵導出超清透明去背圖
+    document.getElementById('exportBtn').onclick = () => {
+        if (!iconGroup) return;
+        const wasCardVisible = bgCard.visible;
+        bgCard.set('visible', false);
+        canvas.renderAll();
+
+        const dataURL = canvas.toDataURL({
+            format: 'png',
+            left: iconGroup.left - (iconGroup.width / 2) - 40, 
+            top: iconGroup.top - (iconGroup.height / 2) - 40,
+            width: iconGroup.width + 80, 
+            height: iconGroup.height + 80,
+            multiplier: 3 
+        });
+
+        const link = document.createElement('a');
+        link.download = `figma-glass-${document.getElementById('iconSelector').value}.png`;
+        link.href = dataURL;
+        link.click();
+
+        bgCard.set('visible', wasCardVisible);
+        canvas.renderAll();
+    };
+
+    window.onload = () => { updateUI(); };
+</script>
+</body>
+</html>

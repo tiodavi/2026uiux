@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 玻璃 Icon 設計產生器 (支援一鍵去背匯出)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #090911;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, system-ui, sans-serif;
+            padding: 20px;
+        }
+
+        .workspace {
+            display: flex;
+            background: #141426;
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 30px 70px rgba(0,0,0,0.6);
+            gap: 40px;
+            max-width: 1000px;
+            width: 100%;
+            align-items: center;
+        }
+
+        .control-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: #1c1c35;
+            padding: 24px;
+            border-radius: 16px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        h2 { font-size: 1.1rem; color: #a25efc; border-bottom: 1px solid #2d2d48; padding-bottom: 6px; margin-bottom: 4px; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; }
+        label { font-size: 0.85rem; color: #a0a0c0; }
+        .val-display { font-size: 0.85rem; color: #92E7FF; font-family: monospace; }
+
+        select {
+            width: 100%; background: #252547; border: 1px solid #444470; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; outline: none;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .theme-btn {
+            height: 35px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.1); }
+        .theme-btn.active { border-color: #fff; box-shadow: 0 0 10px #fff; }
+
+        input[type="range"] { width: 100%; accent-color: #a25efc; cursor: pointer; }
+        input[type="color"] { width: 100%; height: 38px; border: none; border-radius: 6px; background: none; cursor: pointer; }
+
+        /* 🔥 匯出按鈕樣式 */
+        .export-btn {
+            background: linear-gradient(135deg, #a25efc, #681bc6);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(162, 94, 252, 0.4);
+        }
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(162, 94, 252, 0.6);
+        }
+        .export-btn:active { transform: translateY(0); }
+
+        .preview-area {
+            flex: 1.2;
+            background: #05050a;
+            border-radius: 20px;
+            width: 450px;
+            height: 450px;
+            overflow: hidden;
+            position: relative;
+        }
+        #canvas3d { width: 100%; height: 100%; display: block; }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+<div class="workspace">
+    <div class="control-panel">
+        
+        <h2>樣式與色票選擇</h2>
+        <div class="control-group">
+            <label>選擇 Icon 形狀</label>
+            <select id="iconSelector">
+                <option value="sphere">🔮 圓潤發光球體</option>
+                <option value="bell">🔔 智慧通知鈴鐺</option>
+                <option value="gear">⚙️ 科技質感齒輪</option>
+                <option value="diamond">💎 璀璨幾何鑽石</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>快速套用圖片色票 (Themes)</label>
+            <div class="theme-grid" id="themeGrid"></div>
+        </div>
+
+        <h2>1. 玻璃主體微調</h2>
+        <div class="control-group">
+            <label>自定義核心色彩</label>
+            <input type="color" id="glassColor" value="#00FBFF">
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>玻璃實體厚度 (Thickness)</label><span class="val-display" id="thickVal">0.7</span></div>
+            <input type="range" id="glassThickness" min="0.1" max="2.0" step="0.1" value="0.7">
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>毛玻璃霧面感 (Roughness)</label><span class="val-display" id="roughVal">0.05</span></div>
+            <input type="range" id="glassRoughness" min="0.0" max="0.5" step="0.01" value="0.05">
+        </div>
+
+        <h2>2. 表面反光 (圖2效果)</h2>
+        <div class="control-group">
+            <div class="control-row"><label>高光層亮度 (Clearcoat)</label><span class="val-display" id="coatVal">1.0</span></div>
+            <input type="range" id="glassClearcoat" min="0.0" max="1.0" step="0.1" value="1.0">
+        </div>
+        <div class="control-group">
+            <label>背景卡片顏色 (僅網頁預覽有效)</label>
+            <input type="color" id="cardColor" value="#E5F2FA">
+        </div>
+
+        <button class="export-btn" id="exportBtn">💾 匯出高品質透明 PNG</button>
+    </div>
+
+    <div class="preview-area">
+        <canvas id="canvas3d"></canvas>
+    </div>
+</div>
+
+<script>
+    const figmaThemes = [
+        { main: '#A2FF92', sub: '#00E5FF', bg: '#E5F2FA' },
+        { main: '#00FBFF', sub: '#A25EFC', bg: '#DECCFC' },
+        { main: '#F7FF92', sub: '#11CAA0', bg: '#F0F9F1' },
+        { main: '#FFEB92', sub: '#FF60B2', bg: '#FFF1F5' },
+        { main: '#F2D2FF', sub: '#9400D3', bg: '#E5F2FA' }
+    ];
+
+    const canvas = document.getElementById('canvas3d');
+    const container = canvas.parentElement;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.set(0, 0, 5);
+
+    // 🔥 關鍵設定：preserveDrawingBuffer: true 允許 JavaScript 抓取圖片檔案
+    const renderer = new THREE.WebGLRenderer({ 
+        canvas: canvas, 
+        antialias: true, 
+        alpha: true,
+        preserveDrawingBuffer: true 
+    });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // 建立背景卡片
+    const cardGeometry = new THREE.BoxGeometry(2.8, 2.8, 0.1);
+    const cardMaterial = new THREE.MeshStandardMaterial({ color: 0xE5F2FA, roughness: 0.3 });
+    const bgCard = new THREE.Mesh(cardGeometry, cardMaterial);
+    bgCard.position.set(0, 0, -0.5);
+    scene.add(bgCard);
+
+    // 初始化核心物理玻璃材質
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color('#00FBFF'),
+        transmission: 1.0,
+        roughness: 0.05,
+        thickness: 0.7,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.02,
+        ior: 1.5,
+        side: THREE.DoubleSide
+    });
+
+    const iconGroup = new THREE.Group();
+    scene.add(iconGroup);
+
+    function generateIcon(type) {
+        while(iconGroup.children.length > 0){ iconGroup.remove(iconGroup.children[0]); }
+
+        if (type === 'sphere') {
+            const sphereGeo = new THREE.SphereGeometry(0.85, 64, 64);
+            const sphere = new THREE.Mesh(sphereGeo, glassMaterial);
+            iconGroup.add(sphere);
+        } else if (type === 'bell') {
+            const bellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.85, 1.3, 32), glassMaterial);
+            bellBody.position.y = 0.2;
+            iconGroup.add(bellBody);
+            const bellCap = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.15), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+            bellCap.position.y = 0.9;
+            iconGroup.add(bellCap);
+        } else if (type === 'gear') {
+            const core = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 32), glassMaterial);
+            core.rotation.x = Math.PI / 2;
+            iconGroup.add(core);
+            for (let i = 0; i < 8; i++) {
+                const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), glassMaterial);
+                const a = (i/8)*Math.PI*2;
+                tooth.position.set(Math.cos(a)*0.65, Math.sin(a)*0.65, 0);
+                tooth.rotation.z = a;
+                iconGroup.add(tooth);
+            }
+        } else if (type === 'diamond') {
+            const top = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.5, 8), glassMaterial);
+            top.rotation.x = Math.PI; top.position.y = 0.25;
+            iconGroup.add(top);
+            const bottom = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.8, 8), glassMaterial);
+            bottom.position.y = -0.4;
+            iconGroup.add(bottom);
+        }
+    }
+
+    generateIcon('sphere');
+
+    // 燈光設置
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const topLight = new THREE.SpotLight(0xffffff, 2.5); topLight.position.set(5, 5, 5); scene.add(topLight);
+    const sideLight = new THREE.DirectionalLight(0xffffff, 1.0); sideLight.position.set(-3, 2, 2); scene.add(sideLight);
+
+    // 動畫與互動
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = false; controls.enableDamping = true;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const t = Date.now() * 0.001;
+        iconGroup.position.y = Math.sin(t * 1.5) * 0.05;
+        iconGroup.rotation.y += 0.005;
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // UI 事件與色票處理
+    const iconSelector = document.getElementById('iconSelector');
+    const glassColorInput = document.getElementById('glassColor');
+    const cardColorInput = document.getElementById('cardColor');
+    const themeGrid = document.getElementById('themeGrid');
+    const exportBtn = document.getElementById('exportBtn');
+
+    figmaThemes.forEach((theme, index) => {
+        const btn = document.createElement('div');
+        btn.className = 'theme-btn';
+        btn.style.background = `linear-gradient(135deg, ${theme.main}, ${theme.sub})`;
+        btn.onclick = () => {
+            glassColorInput.value = theme.main;
+            cardColorInput.value = theme.bg;
+            updateMaterialFromUI();
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        };
+        themeGrid.appendChild(btn);
+        if(index === 1) btn.classList.add('active');
+    });
+
+    function updateMaterialFromUI() {
+        glassMaterial.color.set(glassColorInput.value);
+        glassMaterial.thickness = parseFloat(document.getElementById('glassThickness').value);
+        glassMaterial.roughness = parseFloat(document.getElementById('glassRoughness').value);
+        glassMaterial.clearcoat = parseFloat(document.getElementById('glassClearcoat').value);
+        cardMaterial.color.set(cardColorInput.value);
+        
+        document.getElementById('thickVal').innerText = document.getElementById('glassThickness').value;
+        document.getElementById('roughVal').innerText = document.getElementById('glassRoughness').value;
+        document.getElementById('coatVal').innerText = document.getElementById('glassClearcoat').value;
+    }
+
+    iconSelector.onchange = (e) => generateIcon(e.target.value);
+    document.querySelectorAll('input').forEach(el => el.oninput = updateMaterialFromUI);
+
+    // 🔥 核心：自動去背匯出 PNG 邏輯
+    exportBtn.onclick = () => {
+        // 1. 暫時將卡片背景與自轉動畫關閉，確保擷取到正面的乾淨 Icon
+        bgCard.visible = false;
+        
+        // 2. 強制渲染一次當前畫面 (此時畫布上只有透明背景 + 3D Icon 本體)
+        renderer.render(scene, camera);
+        
+        // 3. 將 Canvas 轉成 Base64 Data URL 圖片格式
+        const dataURL = canvas.toDataURL('image/png');
+        
+        // 4. 建立虛擬下載連結並觸發下載
+        const link = document.createElement('a');
+        const selectedShape = iconSelector.value;
+        link.download = `3d-glass-${selectedShape}-icon.png`;
+        link.href = dataURL;
+        link.click();
+        
+        // 5. 匯出完成，把背景還原回來，繼續網頁預覽
+        bgCard.visible = true;
+    };
+
+    window.onresize = () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+</script>
+
+</body>
+</html>
