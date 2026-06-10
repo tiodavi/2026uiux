@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>顏色切換測試</title>
+    <style>
+        .container { text-align: center; font-family: sans-serif; margin-top: 50px; }
+        
+        /* 這是模擬外星人的區塊 */
+        #alienBox { 
+            width: 200px; 
+            height: 200px; 
+            margin: 20px auto; 
+            background-color: #3498db; /* 預設藍色 */
+            border-radius: 20px;
+            transition: background-color 0.3s; /* 讓顏色切換有平滑的過渡效果 */
+        }
+        
+        .btn-group { display: flex; gap: 10px; justify-content: center; }
+        .color-btn { width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h3>My Alien (測試模式)</h3>
+        
+        <div id="alienBox"></div>
+        
+        <p>點選下方顏色：</p>
+        <div class="btn-group">
+            <button class="color-btn" style="background-color: #e74c3c;" onclick="changeColor('#e74c3c')"></button>
+            <button class="color-btn" style="background-color: #f1c40f;" onclick="changeColor('#f1c40f')"></button>
+            <button class="color-btn" style="background-color: #3498db;" onclick="changeColor('#3498db')"></button>
+        </div>
+    </div>
+
+    <script>
+        function changeColor(newColor) {
+            // 修改 div 的背景顏色樣式
+            document.getElementById('alienBox').style.backgroundColor = newColor;
+        }
+    </script>
+</body>
+</html>
